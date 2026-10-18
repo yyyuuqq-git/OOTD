@@ -1,0 +1,20 @@
+{
+  "name": "campus-weather-outfit",
+  "version": "1.0.0",
+  "description": "GPS 기반 등하교 시간대별(아침 9시, 점심 12시, 저녁 17시) 날씨 분석 및 캠퍼스 코디 추천 웹페이지",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "weather",
+    "outfit",
+    "campus",
+    "ootd",
+    "gps"
+  ],
+  "author": "",
+  "license": "MIT"
+}
