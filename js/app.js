@@ -49,21 +49,19 @@ function cacheElements() {
   elements.modeWedFri = document.getElementById('modeWedFri');
   elements.modeCustom = document.getElementById('modeCustom');
   elements.customScheduleInputs = document.getElementById('customScheduleInputs');
-  elements.depHourInput = document.getElementById('depHourInput');
-  elements.retHourInput = document.getElementById('retHourInput');
-  elements.depHourVal = document.getElementById('depHourVal');
-  elements.retHourVal = document.getElementById('retHourVal');
+  elements.depTimeInput = document.getElementById('depTimeInput');
+  elements.retTimeInput = document.getElementById('retTimeInput');
+  elements.applyCustomTimeBtn = document.getElementById('applyCustomTimeBtn');
 
   // Sensitivity & Gender
   elements.sensitivitySlider = document.getElementById('sensitivitySlider');
   elements.sensitivityText = document.getElementById('sensitivityText');
   elements.genderBtns = document.querySelectorAll('.gender-btn');
 
-  // Weather Overview
+  // Weather Overview (2 slots: departure & return)
   elements.currentWeatherHero = document.getElementById('currentWeatherHero');
-  elements.morningSlotCard = document.getElementById('morningSlotCard');
-  elements.lunchSlotCard = document.getElementById('lunchSlotCard');
-  elements.eveningSlotCard = document.getElementById('eveningSlotCard');
+  elements.depSlotCard = document.getElementById('depSlotCard');
+  elements.retSlotCard = document.getElementById('retSlotCard');
 
   // Chart Canvas
   elements.tempChartCanvas = document.getElementById('tempChartCanvas');
@@ -170,32 +168,51 @@ function setupEventListeners() {
   elements.modeWedFri.addEventListener('click', () => setScheduleMode('wed_fri'));
   elements.modeCustom.addEventListener('click', () => setScheduleMode('custom'));
 
-  // Custom Hour Sliders
-  elements.depHourInput.addEventListener('input', (e) => {
-    const val = parseInt(e.target.value, 10);
-    state.customDep = val;
-    elements.depHourVal.textContent = `${val}:00`;
-    if (state.customRet <= val) {
-      state.customRet = Math.min(23, val + 1);
-      elements.retHourInput.value = state.customRet;
-      elements.retHourVal.textContent = `${state.customRet}:00`;
-    }
+  // Custom Time Typing Inputs (Direct Keyboard Input)
+  const handleCustomTimeInput = () => {
+    const depH = parseTimeString(elements.depTimeInput?.value, state.customDep);
+    const retH = parseTimeString(elements.retTimeInput?.value, state.customRet);
+    state.customDep = depH;
+    state.customRet = retH;
+    updateSlotCards(state.weatherData);
     renderRecommendations();
     renderChart();
-  });
+  };
 
-  elements.retHourInput.addEventListener('input', (e) => {
-    const val = parseInt(e.target.value, 10);
-    state.customRet = val;
-    elements.retHourVal.textContent = `${val}:00`;
-    if (val <= state.customDep) {
-      state.customDep = Math.max(0, val - 1);
-      elements.depHourInput.value = state.customDep;
-      elements.depHourVal.textContent = `${state.customDep}:00`;
-    }
-    renderRecommendations();
-    renderChart();
-  });
+  if (elements.depTimeInput) {
+    elements.depTimeInput.addEventListener('input', handleCustomTimeInput);
+    elements.depTimeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        handleCustomTimeInput();
+        elements.depTimeInput.value = `${String(state.customDep).padStart(2, '0')}:00`;
+      }
+    });
+    elements.depTimeInput.addEventListener('blur', () => {
+      elements.depTimeInput.value = `${String(state.customDep).padStart(2, '0')}:00`;
+    });
+  }
+
+  if (elements.retTimeInput) {
+    elements.retTimeInput.addEventListener('input', handleCustomTimeInput);
+    elements.retTimeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        handleCustomTimeInput();
+        elements.retTimeInput.value = `${String(state.customRet).padStart(2, '0')}:00`;
+      }
+    });
+    elements.retTimeInput.addEventListener('blur', () => {
+      elements.retTimeInput.value = `${String(state.customRet).padStart(2, '0')}:00`;
+    });
+  }
+
+  if (elements.applyCustomTimeBtn) {
+    elements.applyCustomTimeBtn.addEventListener('click', () => {
+      handleCustomTimeInput();
+      elements.depTimeInput.value = `${String(state.customDep).padStart(2, '0')}:00`;
+      elements.retTimeInput.value = `${String(state.customRet).padStart(2, '0')}:00`;
+      showToast(`⏰ 출발 ${state.customDep}시, 하교 ${state.customRet}시가 적용되었습니다.`, 'success');
+    });
+  }
 
   // Sensitivity Slider
   elements.sensitivitySlider.addEventListener('input', (e) => {
@@ -283,11 +300,39 @@ async function loadWeatherData() {
 }
 
 /**
+ * Time Parsing Helper (supports '9', '09:00', '9:30', '17시', etc.)
+ */
+function parseTimeString(str, defaultHour) {
+  if (!str) return defaultHour;
+  const cleaned = String(str).trim().replace(/시.*$/, '');
+  if (cleaned.includes(':')) {
+    const parts = cleaned.split(':');
+    const h = parseInt(parts[0], 10);
+    if (!isNaN(h) && h >= 0 && h <= 23) return h;
+  }
+  const h = parseInt(cleaned, 10);
+  if (!isNaN(h) && h >= 0 && h <= 23) return h;
+  return defaultHour;
+}
+
+/**
  * Switch schedule mode
  */
 function setScheduleMode(mode) {
   state.scheduleMode = mode;
+  if (mode === 'mon_thu') {
+    state.customDep = 9;
+    state.customRet = 17;
+    if (elements.depTimeInput) elements.depTimeInput.value = '09:00';
+    if (elements.retTimeInput) elements.retTimeInput.value = '17:00';
+  } else if (mode === 'wed_fri') {
+    state.customDep = 9;
+    state.customRet = 12;
+    if (elements.depTimeInput) elements.depTimeInput.value = '09:00';
+    if (elements.retTimeInput) elements.retTimeInput.value = '12:00';
+  }
   updateScheduleUI();
+  updateSlotCards(state.weatherData);
   renderRecommendations();
   renderChart();
 }
@@ -301,17 +346,6 @@ function updateScheduleUI() {
     elements.customScheduleInputs.style.display = 'flex';
   } else {
     elements.customScheduleInputs.style.display = 'none';
-  }
-
-  // Highlight active slot cards
-  if (elements.morningSlotCard) {
-    elements.morningSlotCard.classList.add('scheduled-active');
-  }
-  if (elements.lunchSlotCard) {
-    elements.lunchSlotCard.classList.toggle('scheduled-active', state.scheduleMode === 'wed_fri');
-  }
-  if (elements.eveningSlotCard) {
-    elements.eveningSlotCard.classList.toggle('scheduled-active', state.scheduleMode === 'mon_thu');
   }
 }
 
@@ -367,32 +401,86 @@ function updateHeroWeather(data) {
 }
 
 /**
- * Render 3 Key Timetable Slot Cards
+ * Render 2 Key Timetable Slot Cards: Departure & Return
  */
 function updateSlotCards(data) {
+  if (!data) return;
   const { morning, lunch, evening } = data.slots;
+  const hourly = data.hourly;
 
-  renderSingleSlotCard(elements.morningSlotCard, morning, {
-    badgeText: '등교 공통',
-    badgeClass: 'badge-morning',
-    subText: '하루 중 가장 쌀쌀한 시간'
-  });
+  let depSlot;
+  let retSlot;
+  let depMeta;
+  let retMeta;
 
-  renderSingleSlotCard(elements.lunchSlotCard, lunch, {
-    badgeText: '수·금 하교',
-    badgeClass: 'badge-lunch',
-    subText: '점심시간 & 빠른 하교'
-  });
+  if (state.scheduleMode === 'mon_thu') {
+    depSlot = morning;
+    retSlot = evening;
+    depMeta = {
+      badgeText: '월·목 등교',
+      badgeClass: 'badge-morning',
+      subText: '하루 중 가장 쌀쌀한 시간 (외투 착용 권장)'
+    };
+    retMeta = {
+      badgeText: '월·목 하교',
+      badgeClass: 'badge-evening',
+      subText: '오후 수업 후 일몰 전 늦은 하교 (찬바람 주의)'
+    };
+  } else if (state.scheduleMode === 'wed_fri') {
+    depSlot = morning;
+    retSlot = lunch;
+    depMeta = {
+      badgeText: '수·금 등교',
+      badgeClass: 'badge-morning',
+      subText: '하루 중 가장 쌀쌀한 시간 (가벼운 겉옷)'
+    };
+    retMeta = {
+      badgeText: '수·금 하교',
+      badgeClass: 'badge-lunch',
+      subText: '점심시간 빠른 하교 (포근한 귀가길)'
+    };
+  } else {
+    // Custom Schedule (Direct typed hours)
+    const dItem = hourly[state.customDep] || hourly[9];
+    const rItem = hourly[state.customRet] || hourly[17];
+    depSlot = {
+      timeRange: `${String(state.customDep).padStart(2, '0')}:00 ~ ${String(Math.min(23, state.customDep + 1)).padStart(2, '0')}:00`,
+      temp: dItem.temp,
+      apparentTemp: dItem.apparentTemp,
+      rainProb: dItem.rainProb,
+      weatherInfo: dItem.weatherInfo,
+      windSpeed: dItem.windSpeed,
+      humidity: dItem.humidity,
+      uvIndex: dItem.uvIndex
+    };
+    retSlot = {
+      timeRange: `${String(state.customRet).padStart(2, '0')}:00 ~ ${String(Math.min(23, state.customRet + 1)).padStart(2, '0')}:00`,
+      temp: rItem.temp,
+      apparentTemp: rItem.apparentTemp,
+      rainProb: rItem.rainProb,
+      weatherInfo: rItem.weatherInfo,
+      windSpeed: rItem.windSpeed,
+      humidity: rItem.humidity,
+      uvIndex: rItem.uvIndex
+    };
+    depMeta = {
+      badgeText: '출발 시간',
+      badgeClass: 'badge-morning',
+      subText: `${state.customDep}시 등교/출발 시점 날씨`
+    };
+    retMeta = {
+      badgeText: '하교 / 복귀',
+      badgeClass: 'badge-evening',
+      subText: `${state.customRet}시 하교/귀가 시점 날씨`
+    };
+  }
 
-  renderSingleSlotCard(elements.eveningSlotCard, evening, {
-    badgeText: '월·목 하교',
-    badgeClass: 'badge-evening',
-    subText: '오후 수업 후 늦은 하교'
-  });
+  renderSingleSlotCard(elements.depSlotCard, depSlot, depMeta);
+  renderSingleSlotCard(elements.retSlotCard, retSlot, retMeta);
 }
 
 function renderSingleSlotCard(container, slot, meta) {
-  if (!container) return;
+  if (!container || !slot) return;
   const isRain = slot.rainProb >= 40;
   container.innerHTML = `
     <div class="slot-card-header">
@@ -580,7 +668,8 @@ function renderChart() {
   });
 
   // 5. Draw pinned badges for 등교 & 하교
-  drawBadgePin(ctx, getX(depHour), getY(hourly[depHour].temp), '등교 09시', '#38bdf8');
+  const depLabel = (state.scheduleMode === 'custom') ? `출발 ${depHour}시` : '등교 09시';
+  drawBadgePin(ctx, getX(depHour), getY(hourly[depHour].temp), depLabel, '#38bdf8');
   const retLabel = (state.scheduleMode === 'wed_fri') ? '수·금 하교 12시' : (state.scheduleMode === 'mon_thu') ? '월·목 하교 17시' : `하교 ${retHour}시`;
   drawBadgePin(ctx, getX(retHour), getY(hourly[retHour].temp), retLabel, '#ec4899');
 }
@@ -715,15 +804,20 @@ function copyOutfitSummary() {
     customRet: state.customRet
   });
 
-  const slots = state.weatherData.slots;
+  const hourly = state.weatherData.hourly;
+  const depTimeLabel = (state.scheduleMode === 'mon_thu' || state.scheduleMode === 'wed_fri') ? '09시 등교길' : `${state.customDep}시 출발`;
+  const retTimeLabel = (state.scheduleMode === 'mon_thu') ? '17시 저녁 하교' : (state.scheduleMode === 'wed_fri') ? '12시 점심 하교' : `${state.customRet}시 복귀`;
+
+  const depSlot = (state.scheduleMode === 'custom') ? (hourly[state.customDep] || hourly[9]) : state.weatherData.slots.morning;
+  const retSlot = (state.scheduleMode === 'mon_thu') ? state.weatherData.slots.evening : (state.scheduleMode === 'wed_fri') ? state.weatherData.slots.lunch : (hourly[state.customRet] || hourly[17]);
+
   const summaryText = `[🎓 캠퍼스 등하교 날씨 & OOTD 코디 추천]
 📍 위치: ${state.location.name}
 📅 스케줄: ${rec.scheduleInfo.label}
 
-🌤️ 시간대별 날씨
-- 09시 등교길: ${slots.morning.temp}℃ (${slots.morning.weatherInfo.label}, 강수 ${slots.morning.rainProb}%)
-- 12시 점심(수·금 하교): ${slots.lunch.temp}℃ (${slots.lunch.weatherInfo.label}, 강수 ${slots.lunch.rainProb}%)
-- 17시 저녁(월·목 하교): ${slots.evening.temp}℃ (${slots.evening.weatherInfo.label}, 강수 ${slots.evening.rainProb}%)
+🌤️ 등하교 핵심 시간 날씨
+- 🌅 ${depTimeLabel}: ${depSlot.temp}℃ (${depSlot.weatherInfo.label}, 강수 ${depSlot.rainProb}%)
+- 🏫 ${retTimeLabel}: ${retSlot.temp}℃ (${retSlot.weatherInfo.label}, 강수 ${retSlot.rainProb}%)
 
 💡 오늘 코디 요약:
 ${rec.headline}
@@ -736,7 +830,7 @@ ${rec.rationale}
 - 신발: ${rec.recommendations.shoes[0]?.name || '스니커즈'}
 - 소품: ${rec.recommendations.acc[0]?.name || '가방'}
 
-(기온차 ${rec.diurnalSwing}℃ / ${rec.willRain ? '우산 필수 지참! ☔' : '비 소식 없음 ☀️'})
+(체감 기온차 ${rec.diurnalSwing}℃ / ${rec.willRain ? '우산 필수 지참! ☔' : '비 소식 없음 ☀️'})
 `;
 
   navigator.clipboard.writeText(summaryText).then(() => {

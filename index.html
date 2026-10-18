@@ -99,16 +99,37 @@
           </button>
         </div>
 
-        <!-- Custom hour selector (hidden by default) -->
+        <!-- Custom hour selector with direct keyboard typing -->
         <div id="customScheduleInputs" class="custom-hours-row" style="display: none;">
-          <div class="hour-slider-group">
-            <label for="depHourInput">등교 시간: <strong id="depHourVal">9:00</strong></label>
-            <input type="range" id="depHourInput" min="6" max="18" value="9" step="1">
+          <div class="time-type-group">
+            <label for="depTimeInput">
+              <span class="type-icon">🌅</span>
+              <span class="type-label">등교 / 출발 시간</span>
+            </label>
+            <div class="time-input-box">
+              <input type="text" id="depTimeInput" class="time-type-input" value="09:00" placeholder="예: 09:00 또는 9" maxlength="5">
+              <span class="time-unit">출발</span>
+            </div>
+            <span class="time-type-hint">키보드로 시간 직접 타이핑</span>
           </div>
-          <div class="hour-slider-group">
-            <label for="retHourInput">하교 시간: <strong id="retHourVal">17:00</strong></label>
-            <input type="range" id="retHourInput" min="9" max="23" value="17" step="1">
+
+          <div class="time-arrow-divider">➔</div>
+
+          <div class="time-type-group">
+            <label for="retTimeInput">
+              <span class="type-icon">🏫</span>
+              <span class="type-label">하교 / 복귀 시간</span>
+            </label>
+            <div class="time-input-box">
+              <input type="text" id="retTimeInput" class="time-type-input" value="17:00" placeholder="예: 17:00 또는 17" maxlength="5">
+              <span class="time-unit">하교</span>
+            </div>
+            <span class="time-type-hint">키보드로 시간 직접 타이핑</span>
           </div>
+
+          <button id="applyCustomTimeBtn" class="apply-time-btn" type="button" title="입력한 시간 적용">
+            <span>적용</span>
+          </button>
         </div>
 
         <!-- Personalized preferences bar (Gender & Temperature Sensitivity) -->
@@ -142,27 +163,22 @@
             <div class="hero-loading">날씨 데이터를 불러오고 있습니다...</div>
           </div>
 
-          <!-- 3 Essential Timetable Slots -->
+          <!-- 2 Essential Timetable Slots: Departure & Return -->
           <div class="timetable-slots-group">
             <div class="slots-header">
-              <h2 class="sub-heading">🎯 등하교 3대 핵심 시간대 분석</h2>
-              <span class="slots-hint">등교(09시), 점심(12시), 하교(17시) 실시간 예보</span>
+              <h2 id="slotsSectionTitle" class="sub-heading">🎯 등하교 핵심 시간대 분석 (출발 & 하교)</h2>
+              <span id="slotsSectionHint" class="slots-hint">스케줄 맞춤 2대 핵심 시간대 집중 예보</span>
             </div>
 
             <div class="slots-cards-grid">
-              <!-- Morning Slot Card -->
-              <div id="morningSlotCard" class="slot-card glass-panel">
-                <div class="slot-skeleton">09:00 ~ 10:00 로딩 중...</div>
+              <!-- Departure / Morning Slot Card -->
+              <div id="depSlotCard" class="slot-card glass-panel scheduled-active">
+                <div class="slot-skeleton">출발 시간 날씨 로딩 중...</div>
               </div>
 
-              <!-- Lunch Slot Card -->
-              <div id="lunchSlotCard" class="slot-card glass-panel">
-                <div class="slot-skeleton">12:00 ~ 13:00 로딩 중...</div>
-              </div>
-
-              <!-- Evening Slot Card -->
-              <div id="eveningSlotCard" class="slot-card glass-panel">
-                <div class="slot-skeleton">16:00 ~ 17:00 로딩 중...</div>
+              <!-- Return / Dismissal Slot Card -->
+              <div id="retSlotCard" class="slot-card glass-panel scheduled-active">
+                <div class="slot-skeleton">하교 시간 날씨 로딩 중...</div>
               </div>
             </div>
           </div>

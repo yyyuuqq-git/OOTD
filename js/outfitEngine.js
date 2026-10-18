@@ -315,52 +315,89 @@ export function generateOutfitRecommendation(weatherForecast, scheduleMode = 'mo
   let retHour = 17;
   let scheduleInfo = SCHEDULE_MODES.MON_THU;
 
-  if (scheduleMode === 'wed_fri') {
+  let depSlot;
+  let retSlot;
+  let activeTemps = [];
+  let activeRainProbs = [];
+  let maxWind = 0;
+
+  if (scheduleMode === 'mon_thu') {
+    depHour = 9;
+    retHour = 17;
+    scheduleInfo = SCHEDULE_MODES.MON_THU;
+    depSlot = morning;
+    retSlot = evening;
+    activeTemps = [morning.apparentTemp + sensitivity, lunch.apparentTemp + sensitivity, evening.apparentTemp + sensitivity];
+    activeRainProbs = [morning.rainProb, lunch.rainProb, evening.rainProb];
+    maxWind = Math.max(morning.windSpeed, lunch.windSpeed, evening.windSpeed);
+  } else if (scheduleMode === 'wed_fri') {
+    depHour = 9;
     retHour = 12;
     scheduleInfo = SCHEDULE_MODES.WED_FRI;
-  } else if (scheduleMode === 'custom') {
+    depSlot = morning;
+    retSlot = lunch;
+    activeTemps = [morning.apparentTemp + sensitivity, lunch.apparentTemp + sensitivity];
+    activeRainProbs = [morning.rainProb, lunch.rainProb];
+    maxWind = Math.max(morning.windSpeed, lunch.windSpeed);
+  } else {
     depHour = customDep;
     retHour = customRet;
     scheduleInfo = {
       ...SCHEDULE_MODES.CUSTOM,
       departureHour: depHour,
       returnHour: retHour,
-      description: `${depHour}:00 등교 ~ ${retHour}:00 하교 맞춤 분석입니다.`
+      description: `${depHour}:00 등교/출발 ~ ${retHour}:00 하교/복귀 맞춤 분석입니다.`
     };
+    const hourly = weatherForecast.hourly;
+    const dItem = hourly[depHour] || hourly[9];
+    const rItem = hourly[retHour] || hourly[17];
+    depSlot = {
+      title: '등교 / 출발 시간',
+      timeRange: `${String(depHour).padStart(2, '0')}:00`,
+      hour: depHour,
+      temp: dItem.temp,
+      apparentTemp: dItem.apparentTemp,
+      rainProb: dItem.rainProb,
+      weatherInfo: dItem.weatherInfo,
+      windSpeed: dItem.windSpeed,
+      humidity: dItem.humidity,
+      uvIndex: dItem.uvIndex
+    };
+    retSlot = {
+      title: '하교 / 복귀 시간',
+      timeRange: `${String(retHour).padStart(2, '0')}:00`,
+      hour: retHour,
+      temp: rItem.temp,
+      apparentTemp: rItem.apparentTemp,
+      rainProb: rItem.rainProb,
+      weatherInfo: rItem.weatherInfo,
+      windSpeed: rItem.windSpeed,
+      humidity: rItem.humidity,
+      uvIndex: rItem.uvIndex
+    };
+
+    const startH = Math.min(depHour, retHour);
+    const endH = Math.max(depHour, retHour);
+    for (let h = startH; h <= endH; h++) {
+      if (hourly[h]) {
+        activeTemps.push(hourly[h].apparentTemp + sensitivity);
+        activeRainProbs.push(hourly[h].rainProb);
+        maxWind = Math.max(maxWind, hourly[h].windSpeed);
+      }
+    }
   }
-
-  // Determine departure & return weather slots
-  const depSlot = morning;
-  const retSlot = (retHour <= 13) ? lunch : evening;
-
-  // Temperatures with user sensitivity offset (+2 if feels cold easily, -2 if feels hot easily)
-  const effectiveMorningTemp = morning.apparentTemp + sensitivity;
-  const effectiveLunchTemp = lunch.apparentTemp + sensitivity;
-  const effectiveEveningTemp = evening.apparentTemp + sensitivity;
-
-  // Range of temperatures during campus hours
-  const activeTemps = (retHour <= 13)
-    ? [effectiveMorningTemp, effectiveLunchTemp]
-    : [effectiveMorningTemp, effectiveLunchTemp, effectiveEveningTemp];
 
   const minCampusTemp = Math.min(...activeTemps);
   const maxCampusTemp = Math.max(...activeTemps);
   const diurnalSwing = maxCampusTemp - minCampusTemp; // Temperature difference during school hours
 
   // Base clothing bracket based on the coolest campus hour (usually morning or evening)
-  // Layering advice will bridge the gap to maxCampusTemp!
   const baseBracket = findBracket(minCampusTemp);
   const maxBracket = findBracket(maxCampusTemp);
 
   // Analyze Rain/Precipitation during campus hours
-  const activeRainProbs = (retHour <= 13)
-    ? [morning.rainProb, lunch.rainProb]
-    : [morning.rainProb, lunch.rainProb, evening.rainProb];
   const maxRainProb = Math.max(...activeRainProbs);
-  const willRain = maxRainProb >= 40 || [morning.weatherInfo.type, lunch.weatherInfo.type, evening.weatherInfo.type].includes('rain');
-
-  // Analyze Wind
-  const maxWind = Math.max(morning.windSpeed, lunch.windSpeed, evening.windSpeed);
+  const willRain = maxRainProb >= 40 || [depSlot.weatherInfo.type, retSlot.weatherInfo.type].includes('rain');
   const isWindy = maxWind >= 4.5;
 
   // Generate personalized headline and detailed story
