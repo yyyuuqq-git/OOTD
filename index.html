@@ -64,43 +64,15 @@
     </header>
 
     <main class="main-content">
-      <!-- Schedule Controller Banner -->
+      <!-- Schedule Controller: Departure & Return Time Input Bar -->
       <section class="schedule-control-card glass-panel">
         <div class="section-badge-row">
-          <span class="control-section-badge">📅 등하교 스케줄 맞춤 설정</span>
+          <span class="control-section-badge">⏱️ 출발 & 복귀 시간 설정</span>
           <span id="lastUpdated" class="last-updated-text">업데이트 중...</span>
         </div>
 
-        <div class="schedule-mode-selector">
-          <button id="modeMonThu" class="mode-tab-btn" data-mode="mon_thu">
-            <span class="mode-icon">📌</span>
-            <div class="mode-info">
-              <strong class="mode-title">월·목 모드 (종일 외출)</strong>
-              <span class="mode-desc">09:00 등교 ~ 17:00 하교 (오후 수업 대비)</span>
-            </div>
-            <span class="mode-tag tag-long">오후 하교</span>
-          </button>
-
-          <button id="modeWedFri" class="mode-tab-btn" data-mode="wed_fri">
-            <span class="mode-icon">🥪</span>
-            <div class="mode-info">
-              <strong class="mode-title">수·금 모드 (점심 하교)</strong>
-              <span class="mode-desc">09:00 등교 ~ 12:00 하교 (점심 칼퇴)</span>
-            </div>
-            <span class="mode-tag tag-short">점심 하교</span>
-          </button>
-
-          <button id="modeCustom" class="mode-tab-btn" data-mode="custom">
-            <span class="mode-icon">⚙️</span>
-            <div class="mode-info">
-              <strong class="mode-title">자율 스케줄</strong>
-              <span class="mode-desc">출발 및 복귀 시간 직접 지정</span>
-            </div>
-          </button>
-        </div>
-
-        <!-- Custom hour selector with 10-minute direct keyboard typing -->
-        <div id="customScheduleInputs" class="custom-hours-row" style="display: none;">
+        <!-- Departure & Return Time Selector with 10-minute direct keyboard typing -->
+        <div id="customScheduleInputs" class="custom-hours-row">
           <div class="time-type-group">
             <label for="depTimeInput">
               <span class="type-icon">🌅</span>

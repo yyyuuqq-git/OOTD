@@ -317,96 +317,78 @@ export function generateOutfitRecommendation(weatherForecast, scheduleMode = 'mo
 
   let depSlot;
   let retSlot;
+  const depH = (typeof customDep === 'object' && customDep !== null) ? customDep.hour : parseInt(customDep, 10);
+  const depM = (typeof customDep === 'object' && customDep !== null) ? (customDep.min ?? customDep.minute ?? 0) : 0;
+  const retH = (typeof customRet === 'object' && customRet !== null) ? customRet.hour : parseInt(customRet, 10);
+  const retM = (typeof customRet === 'object' && customRet !== null) ? (customRet.min ?? customRet.minute ?? 0) : 0;
+
+  const depTimeFormatted = `${String(depH).padStart(2, '0')}:${String(depM).padStart(2, '0')}`;
+  const retTimeFormatted = `${String(retH).padStart(2, '0')}:${String(retM).padStart(2, '0')}`;
+
+  function interpolateSlot(hourly, h, m) {
+    const h1 = Math.max(0, Math.min(23, h));
+    const h2 = Math.min(23, h1 + 1);
+    const it1 = hourly[h1] || hourly[0];
+    const it2 = hourly[h2] || it1;
+    const ratio = m / 60;
+    return {
+      temp: Math.round(it1.temp + (it2.temp - it1.temp) * ratio),
+      apparentTemp: Math.round(it1.apparentTemp + (it2.apparentTemp - it1.apparentTemp) * ratio),
+      rainProb: Math.round(it1.rainProb + (it2.rainProb - it1.rainProb) * ratio),
+      windSpeed: Math.round((it1.windSpeed + (it2.windSpeed - it1.windSpeed) * ratio) * 10) / 10,
+      humidity: Math.round(it1.humidity + (it2.humidity - it1.humidity) * ratio),
+      uvIndex: Math.round((it1.uvIndex + (it2.uvIndex - it1.uvIndex) * ratio) * 10) / 10,
+      weatherInfo: (ratio >= 0.5 && it2.rainProb > it1.rainProb) ? it2.weatherInfo : it1.weatherInfo
+    };
+  }
+
+  const hourly = weatherForecast.hourly;
+  const dItem = interpolateSlot(hourly, depH, depM);
+  const rItem = interpolateSlot(hourly, retH, retM);
+
+  depSlot = {
+    title: '출발 시간',
+    timeRange: depTimeFormatted,
+    hour: depH,
+    min: depM,
+    ...dItem
+  };
+  retSlot = {
+    title: '복귀 시간',
+    timeRange: retTimeFormatted,
+    hour: retH,
+    min: retM,
+    ...rItem
+  };
+
+  scheduleInfo = {
+    id: 'custom',
+    label: `${depTimeFormatted} 출발 ~ ${retTimeFormatted} 복귀`,
+    shortLabel: '맞춤 스케줄',
+    departureHour: depH,
+    returnHour: retH,
+    description: `${depTimeFormatted} 출발 ~ ${retTimeFormatted} 복귀 맞춤 분석입니다.`
+  };
+
   let activeTemps = [];
   let activeRainProbs = [];
   let maxWind = 0;
 
-  if (scheduleMode === 'mon_thu') {
-    depHour = 9;
-    retHour = 17;
-    scheduleInfo = SCHEDULE_MODES.MON_THU;
-    depSlot = morning;
-    retSlot = evening;
-    activeTemps = [morning.apparentTemp + sensitivity, lunch.apparentTemp + sensitivity, evening.apparentTemp + sensitivity];
-    activeRainProbs = [morning.rainProb, lunch.rainProb, evening.rainProb];
-    maxWind = Math.max(morning.windSpeed, lunch.windSpeed, evening.windSpeed);
-  } else if (scheduleMode === 'wed_fri') {
-    depHour = 9;
-    retHour = 12;
-    scheduleInfo = SCHEDULE_MODES.WED_FRI;
-    depSlot = morning;
-    retSlot = lunch;
-    activeTemps = [morning.apparentTemp + sensitivity, lunch.apparentTemp + sensitivity];
-    activeRainProbs = [morning.rainProb, lunch.rainProb];
-    maxWind = Math.max(morning.windSpeed, lunch.windSpeed);
-  } else {
-    const depH = (typeof customDep === 'object' && customDep !== null) ? customDep.hour : parseInt(customDep, 10);
-    const depM = (typeof customDep === 'object' && customDep !== null) ? (customDep.min ?? customDep.minute ?? 0) : 0;
-    const retH = (typeof customRet === 'object' && customRet !== null) ? customRet.hour : parseInt(customRet, 10);
-    const retM = (typeof customRet === 'object' && customRet !== null) ? (customRet.min ?? customRet.minute ?? 0) : 0;
-
-    const depTimeFormatted = `${String(depH).padStart(2, '0')}:${String(depM).padStart(2, '0')}`;
-    const retTimeFormatted = `${String(retH).padStart(2, '0')}:${String(retM).padStart(2, '0')}`;
-
-    function interpolateSlot(hourly, h, m) {
-      const h1 = Math.max(0, Math.min(23, h));
-      const h2 = Math.min(23, h1 + 1);
-      const it1 = hourly[h1] || hourly[0];
-      const it2 = hourly[h2] || it1;
-      const ratio = m / 60;
-      return {
-        temp: Math.round(it1.temp + (it2.temp - it1.temp) * ratio),
-        apparentTemp: Math.round(it1.apparentTemp + (it2.apparentTemp - it1.apparentTemp) * ratio),
-        rainProb: Math.round(it1.rainProb + (it2.rainProb - it1.rainProb) * ratio),
-        windSpeed: Math.round((it1.windSpeed + (it2.windSpeed - it1.windSpeed) * ratio) * 10) / 10,
-        humidity: Math.round(it1.humidity + (it2.humidity - it1.humidity) * ratio),
-        uvIndex: Math.round((it1.uvIndex + (it2.uvIndex - it1.uvIndex) * ratio) * 10) / 10,
-        weatherInfo: (ratio >= 0.5 && it2.rainProb > it1.rainProb) ? it2.weatherInfo : it1.weatherInfo
-      };
-    }
-
-    depHour = depH;
-    retHour = retH;
-    scheduleInfo = {
-      ...SCHEDULE_MODES.CUSTOM,
-      departureHour: depHour,
-      returnHour: retHour,
-      description: `${depTimeFormatted} 출발 ~ ${retTimeFormatted} 복귀 맞춤 분석입니다.`
-    };
-    const hourly = weatherForecast.hourly;
-    const dItem = interpolateSlot(hourly, depH, depM);
-    const rItem = interpolateSlot(hourly, retH, retM);
-    depSlot = {
-      title: '출발 시간',
-      timeRange: depTimeFormatted,
-      hour: depH,
-      min: depM,
-      ...dItem
-    };
-    retSlot = {
-      title: '복귀 시간',
-      timeRange: retTimeFormatted,
-      hour: retH,
-      min: retM,
-      ...rItem
-    };
-
-    const startH = Math.min(depH, retH);
-    const endH = Math.max(depH, retH);
-    for (let h = startH; h <= endH; h++) {
-      if (hourly[h]) {
-        activeTemps.push(hourly[h].apparentTemp + sensitivity);
-        activeRainProbs.push(hourly[h].rainProb);
-        maxWind = Math.max(maxWind, hourly[h].windSpeed);
-      }
+  const startH = Math.min(depH, retH);
+  const endH = Math.max(depH, retH);
+  for (let h = startH; h <= endH; h++) {
+    if (hourly[h]) {
+      activeTemps.push(hourly[h].apparentTemp + sensitivity);
+      activeRainProbs.push(hourly[h].rainProb);
+      maxWind = Math.max(maxWind, hourly[h].windSpeed);
     }
   }
 
   const minCampusTemp = Math.min(...activeTemps);
   const maxCampusTemp = Math.max(...activeTemps);
-  const diurnalSwing = maxCampusTemp - minCampusTemp; // Temperature difference during school hours
+  const diurnalSwing = maxCampusTemp - minCampusTemp;
 
-  // Base clothing bracket based on the coolest campus hour (usually morning or evening)
+  // Base clothing bracket based on the coolest campus hour
   const baseBracket = findBracket(minCampusTemp);
   const maxBracket = findBracket(maxCampusTemp);
 
@@ -416,8 +398,8 @@ export function generateOutfitRecommendation(weatherForecast, scheduleMode = 'mo
   const isWindy = maxWind >= 4.5;
 
   // Generate personalized headline and detailed story
-  let headline = '';
-  let rationale = '';
+  const headline = `${depTimeFormatted} 출발 ~ ${retTimeFormatted} 복귀 맞춤 스마트 코디`;
+  const rationale = `출발(${depSlot.temp}℃)과 복귀(${retSlot.temp}℃) 사이의 체감온도(${minCampusTemp}℃ ~ ${maxCampusTemp}℃)를 종합하여 가장 편안한 착장을 조합했습니다.`;
   const badges = [];
 
   // Diurnal Swing Badge & Advice
@@ -437,37 +419,6 @@ export function generateOutfitRecommendation(weatherForecast, scheduleMode = 'mo
   // Wind Badge
   if (isWindy) {
     badges.push({ type: 'wind', text: `바람 다소 강함 (${maxWind}m/s)` });
-  }
-
-  // Schedule Badge
-  if (scheduleMode === 'mon_thu') {
-    badges.push({ type: 'schedule', text: '월·목 종일 수업 모드' });
-  } else if (scheduleMode === 'wed_fri') {
-    badges.push({ type: 'schedule', text: '수·금 점심 하교 모드' });
-  }
-
-  // Craft Headline and Rationale
-  if (scheduleMode === 'mon_thu') {
-    if (diurnalSwing >= 8) {
-      headline = '월·목 오후 풀타임 수업! 큰 일교차 대비 "겉옷 탈착형 레이어드 룩" 추천';
-      rationale = `아침 9시 등교길(${morning.temp}℃)은 쌀쌀하고 낮(${lunch.temp}℃)엔 기온이 올랐다가, 17시 하교길(${evening.temp}℃)에 다시 찬바람이 붑니다. 강의실에서는 가볍게 벗고 하교 시 다시 챙겨 입을 수 있는 집업, 가디건, 자켓 레이어드가 최선입니다.`;
-    } else {
-      headline = '월·목 오후 하교까지 안정적인 하루! 단정한 캠퍼스 데일리룩';
-      rationale = `아침부터 17시 하교까지 기온 편차가 크지 않아(${minCampusTemp}℃ ~ ${maxCampusTemp}℃), 한 벌의 편안하고 단정한 착장으로 쾌적하게 하루를 보낼 수 있습니다.`;
-    }
-  } else if (scheduleMode === 'wed_fri') {
-    if (diurnalSwing >= 6) {
-      headline = '수·금 점심 꿀하교! 아침만 가볍게 버티는 "이지 캐주얼 룩" 추천';
-      rationale = `09:00 등교길(${morning.temp}℃) 찬 공기만 가벼운 외투로 커버하면, 12:00 하교 시점(${lunch.temp}℃)에는 기온이 최고조에 달합니다. 하교 후 가방에 가볍게 접어 넣거나 어깨에 걸치기 좋은 가디건/셔츠가 제격입니다!`;
-    } else {
-      headline = '수·금 빠른 점심 하교! 가볍고 산뜻한 반일 캠퍼스룩';
-      rationale = `점심 12시에 수업이 끝나므로 저녁 추위를 걱정할 필요가 없습니다. 점심 날씨(${lunch.temp}℃)에 맞춘 편안한 이너 중심 착장을 권장합니다.`;
-    }
-  } else {
-    const depTimeFormatted = (typeof customDep === 'object' && customDep !== null) ? `${String(customDep.hour).padStart(2, '0')}:${String(customDep.min ?? 0).padStart(2, '0')}` : `${customDep}:00`;
-    const retTimeFormatted = (typeof customRet === 'object' && customRet !== null) ? `${String(customRet.hour).padStart(2, '0')}:${String(customRet.min ?? 0).padStart(2, '0')}` : `${customRet}:00`;
-    headline = `${depTimeFormatted} 출발 ~ ${retTimeFormatted} 복귀 맞춤 스마트 코디`;
-    rationale = `출발(${depSlot.temp}℃)과 복귀(${retSlot.temp}℃) 사이의 체감온도(${minCampusTemp}℃ ~ ${maxCampusTemp}℃)를 종합하여 가장 편안한 착장을 조합했습니다.`;
   }
 
   // Filter items based on rain / wind / diurnal swing

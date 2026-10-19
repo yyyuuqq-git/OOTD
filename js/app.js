@@ -44,10 +44,7 @@ function cacheElements() {
   elements.refreshBtn = document.getElementById('refreshBtn');
   elements.lastUpdated = document.getElementById('lastUpdated');
 
-  // Schedule Buttons
-  elements.modeMonThu = document.getElementById('modeMonThu');
-  elements.modeWedFri = document.getElementById('modeWedFri');
-  elements.modeCustom = document.getElementById('modeCustom');
+  // Schedule Inputs (Departure & Return)
   elements.customScheduleInputs = document.getElementById('customScheduleInputs');
   elements.depTimeInput = document.getElementById('depTimeInput');
   elements.retTimeInput = document.getElementById('retTimeInput');
@@ -90,7 +87,6 @@ async function init() {
   cacheElements();
   populatePresets();
   setupEventListeners();
-  updateScheduleUI();
 
   // Try GPS first, fallback to preset
   showToast('📍 GPS 위치를 확인하고 있습니다...', 'info');
@@ -162,11 +158,6 @@ function setupEventListeners() {
     setTimeout(() => elements.refreshBtn.classList.remove('spinning'), 600);
     showToast('🔄 최신 날씨 정보를 갱신했습니다.', 'success');
   });
-
-  // Schedule Buttons
-  elements.modeMonThu.addEventListener('click', () => setScheduleMode('mon_thu'));
-  elements.modeWedFri.addEventListener('click', () => setScheduleMode('wed_fri'));
-  elements.modeCustom.addEventListener('click', () => setScheduleMode('custom'));
 
   // Custom Time Typing Inputs (Direct Keyboard Input with 10-min support)
   const handleCustomTimeInput = (reformatInputs = false) => {
@@ -407,39 +398,7 @@ function getWeatherAtTime(hourly, hour, min) {
   };
 }
 
-/**
- * Switch schedule mode
- */
-function setScheduleMode(mode) {
-  state.scheduleMode = mode;
-  if (mode === 'mon_thu') {
-    state.customDep = { hour: 9, min: 0 };
-    state.customRet = { hour: 17, min: 0 };
-    if (elements.depTimeInput) elements.depTimeInput.value = '09:00';
-    if (elements.retTimeInput) elements.retTimeInput.value = '17:00';
-  } else if (mode === 'wed_fri') {
-    state.customDep = { hour: 9, min: 0 };
-    state.customRet = { hour: 12, min: 0 };
-    if (elements.depTimeInput) elements.depTimeInput.value = '09:00';
-    if (elements.retTimeInput) elements.retTimeInput.value = '12:00';
-  }
-  updateScheduleUI();
-  updateSlotCards(state.weatherData);
-  renderRecommendations();
-  renderChart();
-}
 
-function updateScheduleUI() {
-  elements.modeMonThu.classList.toggle('active', state.scheduleMode === 'mon_thu');
-  elements.modeWedFri.classList.toggle('active', state.scheduleMode === 'wed_fri');
-  elements.modeCustom.classList.toggle('active', state.scheduleMode === 'custom');
-
-  if (state.scheduleMode === 'custom') {
-    elements.customScheduleInputs.style.display = 'flex';
-  } else {
-    elements.customScheduleInputs.style.display = 'none';
-  }
-}
 
 /**
  * Render Hero Current Weather
@@ -493,82 +452,47 @@ function updateHeroWeather(data) {
 }
 
 /**
- * Render 2 Key Timetable Slot Cards: Departure & Return (with 30-min precision)
+ * Render 2 Key Timetable Slot Cards: Departure & Return (with 10-min precision)
  */
 function updateSlotCards(data) {
   if (!data) return;
-  const { morning, lunch, evening } = data.slots;
   const hourly = data.hourly;
 
-  let depSlot;
-  let retSlot;
-  let depMeta;
-  let retMeta;
+  const dItem = getWeatherAtTime(hourly, state.customDep.hour, state.customDep.min);
+  const rItem = getWeatherAtTime(hourly, state.customRet.hour, state.customRet.min);
+  const depStr = formatTimeObj(state.customDep);
+  const retStr = formatTimeObj(state.customRet);
 
-  if (state.scheduleMode === 'mon_thu') {
-    depSlot = morning;
-    retSlot = evening;
-    depMeta = {
-      badgeText: '월·목 등교',
-      badgeClass: 'badge-morning',
-      subText: '하루 중 가장 쌀쌀한 시간 (외투 착용 권장)'
-    };
-    retMeta = {
-      badgeText: '월·목 하교',
-      badgeClass: 'badge-evening',
-      subText: '오후 수업 후 일몰 전 늦은 하교 (찬바람 주의)'
-    };
-  } else if (state.scheduleMode === 'wed_fri') {
-    depSlot = morning;
-    retSlot = lunch;
-    depMeta = {
-      badgeText: '수·금 등교',
-      badgeClass: 'badge-morning',
-      subText: '하루 중 가장 쌀쌀한 시간 (가벼운 겉옷)'
-    };
-    retMeta = {
-      badgeText: '수·금 하교',
-      badgeClass: 'badge-lunch',
-      subText: '점심시간 빠른 하교 (포근한 귀가길)'
-    };
-  } else {
-    // Custom Schedule (10-minute interpolated weather)
-    const dItem = getWeatherAtTime(hourly, state.customDep.hour, state.customDep.min);
-    const rItem = getWeatherAtTime(hourly, state.customRet.hour, state.customRet.min);
-    const depStr = formatTimeObj(state.customDep);
-    const retStr = formatTimeObj(state.customRet);
-
-    depSlot = {
-      timeRange: `${depStr} 출발`,
-      temp: dItem.temp,
-      apparentTemp: dItem.apparentTemp,
-      rainProb: dItem.rainProb,
-      weatherInfo: dItem.weatherInfo,
-      windSpeed: dItem.windSpeed,
-      humidity: dItem.humidity,
-      uvIndex: dItem.uvIndex
-    };
-    retSlot = {
-      timeRange: `${retStr} 복귀`,
-      temp: rItem.temp,
-      apparentTemp: rItem.apparentTemp,
-      rainProb: rItem.rainProb,
-      weatherInfo: rItem.weatherInfo,
-      windSpeed: rItem.windSpeed,
-      humidity: rItem.humidity,
-      uvIndex: rItem.uvIndex
-    };
-    depMeta = {
-      badgeText: `출발 ${depStr}`,
-      badgeClass: 'badge-morning',
-      subText: `${depStr} 출발 시점 날씨 (10분 단위 맞춤)`
-    };
-    retMeta = {
-      badgeText: `복귀 ${retStr}`,
-      badgeClass: 'badge-evening',
-      subText: `${retStr} 복귀 시점 날씨 (10분 단위 맞춤)`
-    };
-  }
+  const depSlot = {
+    timeRange: `${depStr} 출발`,
+    temp: dItem.temp,
+    apparentTemp: dItem.apparentTemp,
+    rainProb: dItem.rainProb,
+    weatherInfo: dItem.weatherInfo,
+    windSpeed: dItem.windSpeed,
+    humidity: dItem.humidity,
+    uvIndex: dItem.uvIndex
+  };
+  const retSlot = {
+    timeRange: `${retStr} 복귀`,
+    temp: rItem.temp,
+    apparentTemp: rItem.apparentTemp,
+    rainProb: rItem.rainProb,
+    weatherInfo: rItem.weatherInfo,
+    windSpeed: rItem.windSpeed,
+    humidity: rItem.humidity,
+    uvIndex: rItem.uvIndex
+  };
+  const depMeta = {
+    badgeText: `출발 ${depStr}`,
+    badgeClass: 'badge-morning',
+    subText: `${depStr} 출발 시점 날씨 (10분 단위 맞춤)`
+  };
+  const retMeta = {
+    badgeText: `복귀 ${retStr}`,
+    badgeClass: 'badge-evening',
+    subText: `${retStr} 복귀 시점 날씨 (10분 단위 맞춤)`
+  };
 
   renderSingleSlotCard(elements.depSlotCard, depSlot, depMeta);
   renderSingleSlotCard(elements.retSlotCard, retSlot, retMeta);
@@ -631,22 +555,13 @@ function renderChart() {
   const hourly = state.weatherData.hourly;
   if (!hourly || hourly.length === 0) return;
 
-  // Determine active schedule hours to highlight
-  let depHourVal = 9;
-  let retHourVal = 17;
-  let depLabel = '등교 09시';
-  let retLabel = (state.scheduleMode === 'wed_fri') ? '수·금 하교 12시' : '월·목 하교 17시';
-  let depTemp = hourly[9].temp;
-  let retTemp = (state.scheduleMode === 'wed_fri') ? hourly[12].temp : hourly[17].temp;
-
-  if (state.scheduleMode === 'custom') {
-    depHourVal = state.customDep.hour + state.customDep.min / 60;
-    retHourVal = state.customRet.hour + state.customRet.min / 60;
-    depLabel = `출발 ${formatTimeObj(state.customDep)}`;
-    retLabel = `복귀 ${formatTimeObj(state.customRet)}`;
-    depTemp = getWeatherAtTime(hourly, state.customDep.hour, state.customDep.min).temp;
-    retTemp = getWeatherAtTime(hourly, state.customRet.hour, state.customRet.min).temp;
-  }
+  // Active departure & return hours to highlight
+  const depHourVal = state.customDep.hour + state.customDep.min / 60;
+  const retHourVal = state.customRet.hour + state.customRet.min / 60;
+  const depLabel = `출발 ${formatTimeObj(state.customDep)}`;
+  const retLabel = `복귀 ${formatTimeObj(state.customRet)}`;
+  const depTemp = getWeatherAtTime(hourly, state.customDep.hour, state.customDep.min).temp;
+  const retTemp = getWeatherAtTime(hourly, state.customRet.hour, state.customRet.min).temp;
 
   const depHour = Math.floor(depHourVal);
   const retHour = Math.floor(retHourVal);
@@ -900,7 +815,7 @@ function renderChecklist(checklist) {
 function copyOutfitSummary() {
   if (!state.weatherData) return;
 
-  const rec = generateOutfitRecommendation(state.weatherData, state.scheduleMode, {
+  const rec = generateOutfitRecommendation(state.weatherData, 'custom', {
     gender: state.gender,
     sensitivity: state.sensitivity,
     customDep: state.customDep,
@@ -908,19 +823,19 @@ function copyOutfitSummary() {
   });
 
   const hourly = state.weatherData.hourly;
-  const depTimeLabel = (state.scheduleMode === 'mon_thu' || state.scheduleMode === 'wed_fri') ? '09시 등교길' : `${formatTimeObj(state.customDep)} 출발`;
-  const retTimeLabel = (state.scheduleMode === 'mon_thu') ? '17시 저녁 하교' : (state.scheduleMode === 'wed_fri') ? '12시 점심 하교' : `${formatTimeObj(state.customRet)} 복귀`;
+  const depTimeLabel = `${formatTimeObj(state.customDep)} 출발`;
+  const retTimeLabel = `${formatTimeObj(state.customRet)} 복귀`;
 
-  const depSlot = (state.scheduleMode === 'custom') ? getWeatherAtTime(hourly, state.customDep.hour, state.customDep.min) : state.weatherData.slots.morning;
-  const retSlot = (state.scheduleMode === 'mon_thu') ? state.weatherData.slots.evening : (state.scheduleMode === 'wed_fri') ? state.weatherData.slots.lunch : getWeatherAtTime(hourly, state.customRet.hour, state.customRet.min);
+  const depSlot = getWeatherAtTime(hourly, state.customDep.hour, state.customDep.min);
+  const retSlot = getWeatherAtTime(hourly, state.customRet.hour, state.customRet.min);
 
-  const summaryText = `[🎓 캠퍼스 등하교 날씨 & OOTD 코디 추천]
+  const summaryText = `[🎓 캠퍼스 날씨 & OOTD 코디 추천]
 📍 위치: ${state.location.name}
-📅 스케줄: ${rec.scheduleInfo.label}
+📅 스케줄: ${depTimeLabel} ~ ${retTimeLabel}
 
-🌤️ 등하교 핵심 시간 날씨
+🌤️ 출발 & 복귀 핵심 시간 날씨
 - 🌅 ${depTimeLabel}: ${depSlot.temp}℃ (${depSlot.weatherInfo.label}, 강수 ${depSlot.rainProb}%)
-- 🏫 ${retTimeLabel}: ${retSlot.temp}℃ (${retSlot.weatherInfo.label}, 강수 ${retSlot.rainProb}%)
+- 🏠 ${retTimeLabel}: ${retSlot.temp}℃ (${retSlot.weatherInfo.label}, 강수 ${retSlot.rainProb}%)
 
 💡 오늘 코디 요약:
 ${rec.headline}
