@@ -340,44 +340,59 @@ export function generateOutfitRecommendation(weatherForecast, scheduleMode = 'mo
     activeRainProbs = [morning.rainProb, lunch.rainProb];
     maxWind = Math.max(morning.windSpeed, lunch.windSpeed);
   } else {
-    depHour = customDep;
-    retHour = customRet;
+    const depH = (typeof customDep === 'object' && customDep !== null) ? customDep.hour : parseInt(customDep, 10);
+    const depM = (typeof customDep === 'object' && customDep !== null) ? (customDep.min ?? customDep.minute ?? 0) : 0;
+    const retH = (typeof customRet === 'object' && customRet !== null) ? customRet.hour : parseInt(customRet, 10);
+    const retM = (typeof customRet === 'object' && customRet !== null) ? (customRet.min ?? customRet.minute ?? 0) : 0;
+
+    const depTimeFormatted = `${String(depH).padStart(2, '0')}:${String(depM).padStart(2, '0')}`;
+    const retTimeFormatted = `${String(retH).padStart(2, '0')}:${String(retM).padStart(2, '0')}`;
+
+    function interpolateSlot(hourly, h, m) {
+      const h1 = Math.max(0, Math.min(23, h));
+      const h2 = Math.min(23, h1 + 1);
+      const it1 = hourly[h1] || hourly[0];
+      const it2 = hourly[h2] || it1;
+      const ratio = m / 60;
+      return {
+        temp: Math.round(it1.temp + (it2.temp - it1.temp) * ratio),
+        apparentTemp: Math.round(it1.apparentTemp + (it2.apparentTemp - it1.apparentTemp) * ratio),
+        rainProb: Math.round(it1.rainProb + (it2.rainProb - it1.rainProb) * ratio),
+        windSpeed: Math.round((it1.windSpeed + (it2.windSpeed - it1.windSpeed) * ratio) * 10) / 10,
+        humidity: Math.round(it1.humidity + (it2.humidity - it1.humidity) * ratio),
+        uvIndex: Math.round((it1.uvIndex + (it2.uvIndex - it1.uvIndex) * ratio) * 10) / 10,
+        weatherInfo: (ratio >= 0.5 && it2.rainProb > it1.rainProb) ? it2.weatherInfo : it1.weatherInfo
+      };
+    }
+
+    depHour = depH;
+    retHour = retH;
     scheduleInfo = {
       ...SCHEDULE_MODES.CUSTOM,
       departureHour: depHour,
       returnHour: retHour,
-      description: `${depHour}:00 등교/출발 ~ ${retHour}:00 하교/복귀 맞춤 분석입니다.`
+      description: `${depTimeFormatted} 등교/출발 ~ ${retTimeFormatted} 하교/복귀 맞춤 분석입니다.`
     };
     const hourly = weatherForecast.hourly;
-    const dItem = hourly[depHour] || hourly[9];
-    const rItem = hourly[retHour] || hourly[17];
+    const dItem = interpolateSlot(hourly, depH, depM);
+    const rItem = interpolateSlot(hourly, retH, retM);
     depSlot = {
       title: '등교 / 출발 시간',
-      timeRange: `${String(depHour).padStart(2, '0')}:00`,
-      hour: depHour,
-      temp: dItem.temp,
-      apparentTemp: dItem.apparentTemp,
-      rainProb: dItem.rainProb,
-      weatherInfo: dItem.weatherInfo,
-      windSpeed: dItem.windSpeed,
-      humidity: dItem.humidity,
-      uvIndex: dItem.uvIndex
+      timeRange: depTimeFormatted,
+      hour: depH,
+      min: depM,
+      ...dItem
     };
     retSlot = {
       title: '하교 / 복귀 시간',
-      timeRange: `${String(retHour).padStart(2, '0')}:00`,
-      hour: retHour,
-      temp: rItem.temp,
-      apparentTemp: rItem.apparentTemp,
-      rainProb: rItem.rainProb,
-      weatherInfo: rItem.weatherInfo,
-      windSpeed: rItem.windSpeed,
-      humidity: rItem.humidity,
-      uvIndex: rItem.uvIndex
+      timeRange: retTimeFormatted,
+      hour: retH,
+      min: retM,
+      ...rItem
     };
 
-    const startH = Math.min(depHour, retHour);
-    const endH = Math.max(depHour, retHour);
+    const startH = Math.min(depH, retH);
+    const endH = Math.max(depH, retH);
     for (let h = startH; h <= endH; h++) {
       if (hourly[h]) {
         activeTemps.push(hourly[h].apparentTemp + sensitivity);
@@ -449,7 +464,9 @@ export function generateOutfitRecommendation(weatherForecast, scheduleMode = 'mo
       rationale = `점심 12시에 수업이 끝나므로 저녁 추위를 걱정할 필요가 없습니다. 점심 날씨(${lunch.temp}℃)에 맞춘 편안한 이너 중심 착장을 권장합니다.`;
     }
   } else {
-    headline = `${depHour}시 등교 ~ ${retHour}시 하교 맞춤 스마트 코디`;
+    const depTimeFormatted = (typeof customDep === 'object' && customDep !== null) ? `${String(customDep.hour).padStart(2, '0')}:${String(customDep.min ?? 0).padStart(2, '0')}` : `${customDep}:00`;
+    const retTimeFormatted = (typeof customRet === 'object' && customRet !== null) ? `${String(customRet.hour).padStart(2, '0')}:${String(customRet.min ?? 0).padStart(2, '0')}` : `${customRet}:00`;
+    headline = `${depTimeFormatted} 등교 ~ ${retTimeFormatted} 하교 맞춤 스마트 코디`;
     rationale = `등교(${depSlot.temp}℃)와 하교(${retSlot.temp}℃) 사이의 체감온도(${minCampusTemp}℃ ~ ${maxCampusTemp}℃)를 종합하여 가장 편안한 착장을 조합했습니다.`;
   }
 

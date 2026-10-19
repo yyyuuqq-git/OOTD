@@ -451,7 +451,8 @@ body {
   background: rgba(30, 41, 59, 0.85);
   border: 1.5px solid var(--border-glass);
   border-radius: var(--radius-md);
-  padding: 4px 12px;
+  padding: 4px 8px;
+  gap: 6px;
   transition: all 0.2s ease;
   box-shadow: var(--shadow-sm);
 }
@@ -462,14 +463,39 @@ body {
   background: rgba(30, 41, 67, 0.95);
 }
 
+.time-step-btn {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid var(--border-glass);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 4px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.time-step-btn:hover {
+  background: rgba(99, 102, 241, 0.35);
+  color: #ffffff;
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
+.time-step-btn:active {
+  transform: scale(0.95);
+}
+
 .time-type-input {
   background: transparent;
   border: none;
   color: #ffffff;
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 800;
-  width: 90px;
+  width: 78px;
   text-align: center;
   letter-spacing: 1px;
   outline: none;

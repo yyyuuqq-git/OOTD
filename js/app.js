@@ -25,8 +25,8 @@ const state = {
   },
   weatherData: null,
   scheduleMode: getDefaultScheduleMode(), // auto-detect today's weekday
-  customDep: 9,
-  customRet: 17,
+  customDep: { hour: 9, min: 0 },
+  customRet: { hour: 17, min: 0 },
   gender: 'unisex',
   sensitivity: 0,
   checkedItems: new Set(),
@@ -168,12 +168,39 @@ function setupEventListeners() {
   elements.modeWedFri.addEventListener('click', () => setScheduleMode('wed_fri'));
   elements.modeCustom.addEventListener('click', () => setScheduleMode('custom'));
 
-  // Custom Time Typing Inputs (Direct Keyboard Input)
+  // Step buttons listener (-30분, +30분)
+  document.querySelectorAll('.time-step-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.dataset.target;
+      const stepMinutes = parseInt(btn.dataset.step, 10);
+      const isDep = targetId === 'depTimeInput';
+      const targetInput = isDep ? elements.depTimeInput : elements.retTimeInput;
+      if (!targetInput) return;
+
+      const currObj = isDep ? state.customDep : state.customRet;
+      let totalMinutes = currObj.hour * 60 + currObj.min + stepMinutes;
+      totalMinutes = Math.max(0, Math.min(23 * 60 + 30, totalMinutes));
+
+      const newHour = Math.floor(totalMinutes / 60);
+      const newMin = (totalMinutes % 60 >= 30) ? 30 : 0;
+      const newObj = { hour: newHour, min: newMin };
+
+      if (isDep) state.customDep = newObj;
+      else state.customRet = newObj;
+
+      targetInput.value = formatTimeObj(newObj);
+      updateSlotCards(state.weatherData);
+      renderRecommendations();
+      renderChart();
+    });
+  });
+
+  // Custom Time Typing Inputs (Direct Keyboard Input with 30-min support)
   const handleCustomTimeInput = () => {
-    const depH = parseTimeString(elements.depTimeInput?.value, state.customDep);
-    const retH = parseTimeString(elements.retTimeInput?.value, state.customRet);
-    state.customDep = depH;
-    state.customRet = retH;
+    const depObj = parseTimeString(elements.depTimeInput?.value, state.customDep);
+    const retObj = parseTimeString(elements.retTimeInput?.value, state.customRet);
+    state.customDep = depObj;
+    state.customRet = retObj;
     updateSlotCards(state.weatherData);
     renderRecommendations();
     renderChart();
@@ -184,11 +211,11 @@ function setupEventListeners() {
     elements.depTimeInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         handleCustomTimeInput();
-        elements.depTimeInput.value = `${String(state.customDep).padStart(2, '0')}:00`;
+        elements.depTimeInput.value = formatTimeObj(state.customDep);
       }
     });
     elements.depTimeInput.addEventListener('blur', () => {
-      elements.depTimeInput.value = `${String(state.customDep).padStart(2, '0')}:00`;
+      elements.depTimeInput.value = formatTimeObj(state.customDep);
     });
   }
 
@@ -197,20 +224,20 @@ function setupEventListeners() {
     elements.retTimeInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         handleCustomTimeInput();
-        elements.retTimeInput.value = `${String(state.customRet).padStart(2, '0')}:00`;
+        elements.retTimeInput.value = formatTimeObj(state.customRet);
       }
     });
     elements.retTimeInput.addEventListener('blur', () => {
-      elements.retTimeInput.value = `${String(state.customRet).padStart(2, '0')}:00`;
+      elements.retTimeInput.value = formatTimeObj(state.customRet);
     });
   }
 
   if (elements.applyCustomTimeBtn) {
     elements.applyCustomTimeBtn.addEventListener('click', () => {
       handleCustomTimeInput();
-      elements.depTimeInput.value = `${String(state.customDep).padStart(2, '0')}:00`;
-      elements.retTimeInput.value = `${String(state.customRet).padStart(2, '0')}:00`;
-      showToast(`⏰ 출발 ${state.customDep}시, 하교 ${state.customRet}시가 적용되었습니다.`, 'success');
+      elements.depTimeInput.value = formatTimeObj(state.customDep);
+      elements.retTimeInput.value = formatTimeObj(state.customRet);
+      showToast(`⏰ 출발 ${formatTimeObj(state.customDep)}, 하교 ${formatTimeObj(state.customRet)} 적용 완료!`, 'success');
     });
   }
 
@@ -300,19 +327,83 @@ async function loadWeatherData() {
 }
 
 /**
- * Time Parsing Helper (supports '9', '09:00', '9:30', '17시', etc.)
+ * Time Parsing Helper (supports '9', '09:00', '9:30', '09:30', '9.5', '9시 30분', etc.)
  */
-function parseTimeString(str, defaultHour) {
-  if (!str) return defaultHour;
-  const cleaned = String(str).trim().replace(/시.*$/, '');
+function parseTimeString(str, defaultObj = { hour: 9, min: 0 }) {
+  const defHour = (typeof defaultObj === 'object' && defaultObj !== null) ? defaultObj.hour : 9;
+  const defMin = (typeof defaultObj === 'object' && defaultObj !== null) ? (defaultObj.min ?? 0) : 0;
+  if (!str) return { hour: defHour, min: defMin };
+
+  const cleaned = String(str).trim();
+
+  // "9:30" or "09:30"
   if (cleaned.includes(':')) {
     const parts = cleaned.split(':');
-    const h = parseInt(parts[0], 10);
-    if (!isNaN(h) && h >= 0 && h <= 23) return h;
+    let h = parseInt(parts[0], 10);
+    let m = parseInt(parts[1], 10);
+    if (isNaN(h)) h = defHour;
+    if (isNaN(m)) m = 0;
+    // Snap minute to nearest 30 (0 or 30)
+    m = (m >= 15 && m < 45) ? 30 : (m >= 45 ? 0 : 0);
+    if (parts[1] && parseInt(parts[1], 10) >= 45) h = (h + 1) % 24;
+    h = Math.max(0, Math.min(23, h));
+    return { hour: h, min: m };
   }
-  const h = parseInt(cleaned, 10);
-  if (!isNaN(h) && h >= 0 && h <= 23) return h;
-  return defaultHour;
+
+  // "9시 30분" or "9시30"
+  const koreanMatch = cleaned.match(/(\d+)\s*시\s*(\d*)/);
+  if (koreanMatch) {
+    let h = parseInt(koreanMatch[1], 10);
+    let m = koreanMatch[2] ? parseInt(koreanMatch[2], 10) : 0;
+    if (isNaN(h)) h = defHour;
+    m = (m >= 15 && m < 45) ? 30 : 0;
+    h = Math.max(0, Math.min(23, h));
+    return { hour: h, min: m };
+  }
+
+  // "9.5"
+  const floatVal = parseFloat(cleaned);
+  if (!isNaN(floatVal)) {
+    let h = Math.floor(floatVal);
+    let m = (floatVal % 1 >= 0.25) ? 30 : 0;
+    h = Math.max(0, Math.min(23, h));
+    return { hour: h, min: m };
+  }
+
+  return { hour: defHour, min: defMin };
+}
+
+function formatTimeObj(obj) {
+  const h = (typeof obj === 'object' && obj !== null) ? obj.hour : parseInt(obj, 10);
+  const m = (typeof obj === 'object' && obj !== null) ? (obj.min ?? 0) : 0;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/**
+ * Weather Interpolation Helper for 30-minute increments
+ */
+function getWeatherAtTime(hourly, hour, min) {
+  const h1 = Math.max(0, Math.min(23, hour));
+  const h2 = Math.min(23, h1 + 1);
+  const item1 = hourly[h1] || hourly[0];
+  const item2 = hourly[h2] || item1;
+
+  if (min === 0 || h1 === h2) {
+    return { ...item1 };
+  }
+
+  const ratio = min / 60;
+  return {
+    hour: h1,
+    min,
+    temp: Math.round(item1.temp + (item2.temp - item1.temp) * ratio),
+    apparentTemp: Math.round(item1.apparentTemp + (item2.apparentTemp - item1.apparentTemp) * ratio),
+    rainProb: Math.round(item1.rainProb + (item2.rainProb - item1.rainProb) * ratio),
+    windSpeed: Math.round((item1.windSpeed + (item2.windSpeed - item1.windSpeed) * ratio) * 10) / 10,
+    humidity: Math.round(item1.humidity + (item2.humidity - item1.humidity) * ratio),
+    uvIndex: Math.round((item1.uvIndex + (item2.uvIndex - item1.uvIndex) * ratio) * 10) / 10,
+    weatherInfo: (ratio >= 0.5 && item2.rainProb > item1.rainProb) ? item2.weatherInfo : item1.weatherInfo
+  };
 }
 
 /**
@@ -321,13 +412,13 @@ function parseTimeString(str, defaultHour) {
 function setScheduleMode(mode) {
   state.scheduleMode = mode;
   if (mode === 'mon_thu') {
-    state.customDep = 9;
-    state.customRet = 17;
+    state.customDep = { hour: 9, min: 0 };
+    state.customRet = { hour: 17, min: 0 };
     if (elements.depTimeInput) elements.depTimeInput.value = '09:00';
     if (elements.retTimeInput) elements.retTimeInput.value = '17:00';
   } else if (mode === 'wed_fri') {
-    state.customDep = 9;
-    state.customRet = 12;
+    state.customDep = { hour: 9, min: 0 };
+    state.customRet = { hour: 12, min: 0 };
     if (elements.depTimeInput) elements.depTimeInput.value = '09:00';
     if (elements.retTimeInput) elements.retTimeInput.value = '12:00';
   }
@@ -401,7 +492,7 @@ function updateHeroWeather(data) {
 }
 
 /**
- * Render 2 Key Timetable Slot Cards: Departure & Return
+ * Render 2 Key Timetable Slot Cards: Departure & Return (with 30-min precision)
  */
 function updateSlotCards(data) {
   if (!data) return;
@@ -440,11 +531,14 @@ function updateSlotCards(data) {
       subText: '점심시간 빠른 하교 (포근한 귀가길)'
     };
   } else {
-    // Custom Schedule (Direct typed hours)
-    const dItem = hourly[state.customDep] || hourly[9];
-    const rItem = hourly[state.customRet] || hourly[17];
+    // Custom Schedule (30-minute interpolated weather)
+    const dItem = getWeatherAtTime(hourly, state.customDep.hour, state.customDep.min);
+    const rItem = getWeatherAtTime(hourly, state.customRet.hour, state.customRet.min);
+    const depStr = formatTimeObj(state.customDep);
+    const retStr = formatTimeObj(state.customRet);
+
     depSlot = {
-      timeRange: `${String(state.customDep).padStart(2, '0')}:00 ~ ${String(Math.min(23, state.customDep + 1)).padStart(2, '0')}:00`,
+      timeRange: `${depStr} 출발`,
       temp: dItem.temp,
       apparentTemp: dItem.apparentTemp,
       rainProb: dItem.rainProb,
@@ -454,7 +548,7 @@ function updateSlotCards(data) {
       uvIndex: dItem.uvIndex
     };
     retSlot = {
-      timeRange: `${String(state.customRet).padStart(2, '0')}:00 ~ ${String(Math.min(23, state.customRet + 1)).padStart(2, '0')}:00`,
+      timeRange: `${retStr} 하교`,
       temp: rItem.temp,
       apparentTemp: rItem.apparentTemp,
       rainProb: rItem.rainProb,
@@ -464,14 +558,14 @@ function updateSlotCards(data) {
       uvIndex: rItem.uvIndex
     };
     depMeta = {
-      badgeText: '출발 시간',
+      badgeText: `출발 ${depStr}`,
       badgeClass: 'badge-morning',
-      subText: `${state.customDep}시 등교/출발 시점 날씨`
+      subText: `${depStr} 등교/출발 시점 날씨 (30분 단위 보간)`
     };
     retMeta = {
-      badgeText: '하교 / 복귀',
+      badgeText: `하교 ${retStr}`,
       badgeClass: 'badge-evening',
-      subText: `${state.customRet}시 하교/귀가 시점 날씨`
+      subText: `${retStr} 하교/귀가 시점 날씨 (30분 단위 보간)`
     };
   }
 
@@ -537,13 +631,20 @@ function renderChart() {
   if (!hourly || hourly.length === 0) return;
 
   // Determine active schedule hours to highlight
-  let depHour = 9;
-  let retHour = 17;
-  if (state.scheduleMode === 'wed_fri') {
-    retHour = 12;
-  } else if (state.scheduleMode === 'custom') {
-    depHour = state.customDep;
-    retHour = state.customRet;
+  let depHourVal = 9;
+  let retHourVal = 17;
+  let depLabel = '등교 09시';
+  let retLabel = (state.scheduleMode === 'wed_fri') ? '수·금 하교 12시' : '월·목 하교 17시';
+  let depTemp = hourly[9].temp;
+  let retTemp = (state.scheduleMode === 'wed_fri') ? hourly[12].temp : hourly[17].temp;
+
+  if (state.scheduleMode === 'custom') {
+    depHourVal = state.customDep.hour + state.customDep.min / 60;
+    retHourVal = state.customRet.hour + state.customRet.min / 60;
+    depLabel = `출발 ${formatTimeObj(state.customDep)}`;
+    retLabel = `하교 ${formatTimeObj(state.customRet)}`;
+    depTemp = getWeatherAtTime(hourly, state.customDep.hour, state.customDep.min).temp;
+    retTemp = getWeatherAtTime(hourly, state.customRet.hour, state.customRet.min).temp;
   }
 
   // Padding
@@ -564,9 +665,9 @@ function renderChart() {
   const getX = (idx) => padLeft + (idx / 23) * plotW;
   const getY = (temp) => padTop + plotH - ((temp - minT) / rangeT) * plotH;
 
-  // 1. Draw scheduled time range highlight (background band between depHour and retHour)
-  const xDep = getX(depHour);
-  const xRet = getX(retHour);
+  // 1. Draw scheduled time range highlight (background band between depHourVal and retHourVal)
+  const xDep = getX(depHourVal);
+  const xRet = getX(retHourVal);
   const gradBand = ctx.createLinearGradient(0, 0, 0, height);
   gradBand.addColorStop(0, 'rgba(99, 102, 241, 0.16)');
   gradBand.addColorStop(1, 'rgba(99, 102, 241, 0.02)');
@@ -668,10 +769,8 @@ function renderChart() {
   });
 
   // 5. Draw pinned badges for 등교 & 하교
-  const depLabel = (state.scheduleMode === 'custom') ? `출발 ${depHour}시` : '등교 09시';
-  drawBadgePin(ctx, getX(depHour), getY(hourly[depHour].temp), depLabel, '#38bdf8');
-  const retLabel = (state.scheduleMode === 'wed_fri') ? '수·금 하교 12시' : (state.scheduleMode === 'mon_thu') ? '월·목 하교 17시' : `하교 ${retHour}시`;
-  drawBadgePin(ctx, getX(retHour), getY(hourly[retHour].temp), retLabel, '#ec4899');
+  drawBadgePin(ctx, xDep, getY(depTemp), depLabel, '#38bdf8');
+  drawBadgePin(ctx, xRet, getY(retTemp), retLabel, '#ec4899');
 }
 
 function drawBadgePin(ctx, x, y, text, color) {
@@ -805,11 +904,11 @@ function copyOutfitSummary() {
   });
 
   const hourly = state.weatherData.hourly;
-  const depTimeLabel = (state.scheduleMode === 'mon_thu' || state.scheduleMode === 'wed_fri') ? '09시 등교길' : `${state.customDep}시 출발`;
-  const retTimeLabel = (state.scheduleMode === 'mon_thu') ? '17시 저녁 하교' : (state.scheduleMode === 'wed_fri') ? '12시 점심 하교' : `${state.customRet}시 복귀`;
+  const depTimeLabel = (state.scheduleMode === 'mon_thu' || state.scheduleMode === 'wed_fri') ? '09시 등교길' : `${formatTimeObj(state.customDep)} 출발`;
+  const retTimeLabel = (state.scheduleMode === 'mon_thu') ? '17시 저녁 하교' : (state.scheduleMode === 'wed_fri') ? '12시 점심 하교' : `${formatTimeObj(state.customRet)} 복귀`;
 
-  const depSlot = (state.scheduleMode === 'custom') ? (hourly[state.customDep] || hourly[9]) : state.weatherData.slots.morning;
-  const retSlot = (state.scheduleMode === 'mon_thu') ? state.weatherData.slots.evening : (state.scheduleMode === 'wed_fri') ? state.weatherData.slots.lunch : (hourly[state.customRet] || hourly[17]);
+  const depSlot = (state.scheduleMode === 'custom') ? getWeatherAtTime(hourly, state.customDep.hour, state.customDep.min) : state.weatherData.slots.morning;
+  const retSlot = (state.scheduleMode === 'mon_thu') ? state.weatherData.slots.evening : (state.scheduleMode === 'wed_fri') ? state.weatherData.slots.lunch : getWeatherAtTime(hourly, state.customRet.hour, state.customRet.min);
 
   const summaryText = `[🎓 캠퍼스 등하교 날씨 & OOTD 코디 추천]
 📍 위치: ${state.location.name}
