@@ -168,76 +168,59 @@ function setupEventListeners() {
   elements.modeWedFri.addEventListener('click', () => setScheduleMode('wed_fri'));
   elements.modeCustom.addEventListener('click', () => setScheduleMode('custom'));
 
-  // Step buttons listener (-30분, +30분)
-  document.querySelectorAll('.time-step-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const targetId = btn.dataset.target;
-      const stepMinutes = parseInt(btn.dataset.step, 10);
-      const isDep = targetId === 'depTimeInput';
-      const targetInput = isDep ? elements.depTimeInput : elements.retTimeInput;
-      if (!targetInput) return;
-
-      const currObj = isDep ? state.customDep : state.customRet;
-      let totalMinutes = currObj.hour * 60 + currObj.min + stepMinutes;
-      totalMinutes = Math.max(0, Math.min(23 * 60 + 30, totalMinutes));
-
-      const newHour = Math.floor(totalMinutes / 60);
-      const newMin = (totalMinutes % 60 >= 30) ? 30 : 0;
-      const newObj = { hour: newHour, min: newMin };
-
-      if (isDep) state.customDep = newObj;
-      else state.customRet = newObj;
-
-      targetInput.value = formatTimeObj(newObj);
-      updateSlotCards(state.weatherData);
-      renderRecommendations();
-      renderChart();
-    });
-  });
-
-  // Custom Time Typing Inputs (Direct Keyboard Input with 30-min support)
-  const handleCustomTimeInput = () => {
+  // Custom Time Typing Inputs (Direct Keyboard Input with 10-min support)
+  const handleCustomTimeInput = (reformatInputs = false) => {
     const depObj = parseTimeString(elements.depTimeInput?.value, state.customDep);
     const retObj = parseTimeString(elements.retTimeInput?.value, state.customRet);
     state.customDep = depObj;
     state.customRet = retObj;
+    if (reformatInputs) {
+      if (elements.depTimeInput) elements.depTimeInput.value = formatTimeObj(depObj);
+      if (elements.retTimeInput) elements.retTimeInput.value = formatTimeObj(retObj);
+    }
     updateSlotCards(state.weatherData);
     renderRecommendations();
     renderChart();
   };
 
   if (elements.depTimeInput) {
-    elements.depTimeInput.addEventListener('input', handleCustomTimeInput);
+    elements.depTimeInput.addEventListener('input', () => {
+      const val = elements.depTimeInput.value.trim();
+      if (val.length >= 4 || val.includes(':')) {
+        handleCustomTimeInput(false);
+      }
+    });
     elements.depTimeInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
-        handleCustomTimeInput();
-        elements.depTimeInput.value = formatTimeObj(state.customDep);
+        handleCustomTimeInput(true);
       }
     });
     elements.depTimeInput.addEventListener('blur', () => {
-      elements.depTimeInput.value = formatTimeObj(state.customDep);
+      handleCustomTimeInput(true);
     });
   }
 
   if (elements.retTimeInput) {
-    elements.retTimeInput.addEventListener('input', handleCustomTimeInput);
+    elements.retTimeInput.addEventListener('input', () => {
+      const val = elements.retTimeInput.value.trim();
+      if (val.length >= 4 || val.includes(':')) {
+        handleCustomTimeInput(false);
+      }
+    });
     elements.retTimeInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
-        handleCustomTimeInput();
-        elements.retTimeInput.value = formatTimeObj(state.customRet);
+        handleCustomTimeInput(true);
       }
     });
     elements.retTimeInput.addEventListener('blur', () => {
-      elements.retTimeInput.value = formatTimeObj(state.customRet);
+      handleCustomTimeInput(true);
     });
   }
 
   if (elements.applyCustomTimeBtn) {
     elements.applyCustomTimeBtn.addEventListener('click', () => {
-      handleCustomTimeInput();
-      elements.depTimeInput.value = formatTimeObj(state.customDep);
-      elements.retTimeInput.value = formatTimeObj(state.customRet);
-      showToast(`⏰ 출발 ${formatTimeObj(state.customDep)}, 하교 ${formatTimeObj(state.customRet)} 적용 완료!`, 'success');
+      handleCustomTimeInput(true);
+      showToast(`⏰ 출발 ${formatTimeObj(state.customDep)}, 복귀 ${formatTimeObj(state.customRet)} 적용 완료!`, 'success');
     });
   }
 
@@ -327,7 +310,7 @@ async function loadWeatherData() {
 }
 
 /**
- * Time Parsing Helper (supports '9', '09:00', '9:30', '09:30', '9.5', '9시 30분', etc.)
+ * Time Parsing Helper (supports '09:10', '9:20', '0910', '1640', '9시 20분', '9', etc. with 10-minute precision)
  */
 function parseTimeString(str, defaultObj = { hour: 9, min: 0 }) {
   const defHour = (typeof defaultObj === 'object' && defaultObj !== null) ? defaultObj.hour : 9;
@@ -336,38 +319,56 @@ function parseTimeString(str, defaultObj = { hour: 9, min: 0 }) {
 
   const cleaned = String(str).trim();
 
-  // "9:30" or "09:30"
+  // Helper: round/snap minute to nearest 10-minute interval (0, 10, 20, 30, 40, 50, or 60 -> next hour)
+  const snapTo10 = (h, m) => {
+    let roundedM = Math.round(m / 10) * 10;
+    if (roundedM >= 60) {
+      h = (h + 1) % 24;
+      roundedM = 0;
+    }
+    h = Math.max(0, Math.min(23, h));
+    return { hour: h, min: roundedM };
+  };
+
+  // 1. "09:10" or "9:20" or "16:40"
   if (cleaned.includes(':')) {
     const parts = cleaned.split(':');
     let h = parseInt(parts[0], 10);
     let m = parseInt(parts[1], 10);
     if (isNaN(h)) h = defHour;
     if (isNaN(m)) m = 0;
-    // Snap minute to nearest 30 (0 or 30)
-    m = (m >= 15 && m < 45) ? 30 : (m >= 45 ? 0 : 0);
-    if (parts[1] && parseInt(parts[1], 10) >= 45) h = (h + 1) % 24;
-    h = Math.max(0, Math.min(23, h));
-    return { hour: h, min: m };
+    return snapTo10(h, m);
   }
 
-  // "9시 30분" or "9시30"
+  // 2. "0910", "1640", "920" (3-4 digits without colon)
+  const digitsMatch = cleaned.match(/^(\d{1,2})(\d{2})$/);
+  if (digitsMatch) {
+    let h = parseInt(digitsMatch[1], 10);
+    let m = parseInt(digitsMatch[2], 10);
+    if (h < 24 && m < 60) {
+      return snapTo10(h, m);
+    }
+  }
+
+  // 3. "9시 10분" or "9시20" or "16시"
   const koreanMatch = cleaned.match(/(\d+)\s*시\s*(\d*)/);
   if (koreanMatch) {
     let h = parseInt(koreanMatch[1], 10);
     let m = koreanMatch[2] ? parseInt(koreanMatch[2], 10) : 0;
     if (isNaN(h)) h = defHour;
-    m = (m >= 15 && m < 45) ? 30 : 0;
-    h = Math.max(0, Math.min(23, h));
-    return { hour: h, min: m };
+    return snapTo10(h, m);
   }
 
-  // "9.5"
+  // 4. "9.5" or "9"
   const floatVal = parseFloat(cleaned);
   if (!isNaN(floatVal)) {
+    if (Number.isInteger(floatVal) || !cleaned.includes('.')) {
+      let h = Math.max(0, Math.min(23, Math.floor(floatVal)));
+      return { hour: h, min: 0 };
+    }
     let h = Math.floor(floatVal);
-    let m = (floatVal % 1 >= 0.25) ? 30 : 0;
-    h = Math.max(0, Math.min(23, h));
-    return { hour: h, min: m };
+    let m = Math.round((floatVal % 1) * 60);
+    return snapTo10(h, m);
   }
 
   return { hour: defHour, min: defMin };
@@ -531,7 +532,7 @@ function updateSlotCards(data) {
       subText: '점심시간 빠른 하교 (포근한 귀가길)'
     };
   } else {
-    // Custom Schedule (30-minute interpolated weather)
+    // Custom Schedule (10-minute interpolated weather)
     const dItem = getWeatherAtTime(hourly, state.customDep.hour, state.customDep.min);
     const rItem = getWeatherAtTime(hourly, state.customRet.hour, state.customRet.min);
     const depStr = formatTimeObj(state.customDep);
@@ -548,7 +549,7 @@ function updateSlotCards(data) {
       uvIndex: dItem.uvIndex
     };
     retSlot = {
-      timeRange: `${retStr} 하교`,
+      timeRange: `${retStr} 복귀`,
       temp: rItem.temp,
       apparentTemp: rItem.apparentTemp,
       rainProb: rItem.rainProb,
@@ -560,12 +561,12 @@ function updateSlotCards(data) {
     depMeta = {
       badgeText: `출발 ${depStr}`,
       badgeClass: 'badge-morning',
-      subText: `${depStr} 등교/출발 시점 날씨 (30분 단위 보간)`
+      subText: `${depStr} 출발 시점 날씨 (10분 단위 맞춤)`
     };
     retMeta = {
-      badgeText: `하교 ${retStr}`,
+      badgeText: `복귀 ${retStr}`,
       badgeClass: 'badge-evening',
-      subText: `${retStr} 하교/귀가 시점 날씨 (30분 단위 보간)`
+      subText: `${retStr} 복귀 시점 날씨 (10분 단위 맞춤)`
     };
   }
 
@@ -642,10 +643,13 @@ function renderChart() {
     depHourVal = state.customDep.hour + state.customDep.min / 60;
     retHourVal = state.customRet.hour + state.customRet.min / 60;
     depLabel = `출발 ${formatTimeObj(state.customDep)}`;
-    retLabel = `하교 ${formatTimeObj(state.customRet)}`;
+    retLabel = `복귀 ${formatTimeObj(state.customRet)}`;
     depTemp = getWeatherAtTime(hourly, state.customDep.hour, state.customDep.min).temp;
     retTemp = getWeatherAtTime(hourly, state.customRet.hour, state.customRet.min).temp;
   }
+
+  const depHour = Math.floor(depHourVal);
+  const retHour = Math.floor(retHourVal);
 
   // Padding
   const padLeft = 32;

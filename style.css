@@ -451,41 +451,17 @@ body {
   background: rgba(30, 41, 59, 0.85);
   border: 1.5px solid var(--border-glass);
   border-radius: var(--radius-md);
-  padding: 4px 8px;
-  gap: 6px;
+  padding: 6px 14px;
+  gap: 8px;
   transition: all 0.2s ease;
   box-shadow: var(--shadow-sm);
 }
 
 .time-input-box:focus-within {
   border-color: var(--accent-cyan);
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
   background: rgba(30, 41, 67, 0.95);
-}
-
-.time-step-btn {
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid var(--border-glass);
-  color: var(--text-muted);
-  border-radius: var(--radius-sm);
-  padding: 4px 7px;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  user-select: none;
-  white-space: nowrap;
-}
-
-.time-step-btn:hover {
-  background: rgba(99, 102, 241, 0.35);
-  color: #ffffff;
-  border-color: var(--accent-primary);
   transform: translateY(-1px);
-}
-
-.time-step-btn:active {
-  transform: scale(0.95);
 }
 
 .time-type-input {
@@ -493,26 +469,28 @@ body {
   border: none;
   color: #ffffff;
   font-family: var(--font-display);
-  font-size: 19px;
+  font-size: 22px;
   font-weight: 800;
-  width: 78px;
+  width: 86px;
   text-align: center;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
   outline: none;
 }
 
 .time-type-input::placeholder {
   color: var(--text-dim);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
+  letter-spacing: 0;
 }
 
 .time-unit {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--accent-cyan);
-  padding-left: 6px;
+  padding-left: 8px;
   border-left: 1px solid var(--border-glass);
+  user-select: none;
 }
 
 .time-type-hint {

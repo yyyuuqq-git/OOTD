@@ -27,7 +27,7 @@ export const SCHEDULE_MODES = {
     shortLabel: '자율 설정',
     departureHour: 9,
     returnHour: 17,
-    description: '사용자가 지정한 등하교 시간에 맞추어 실시간 날씨를 분석합니다.'
+    description: '사용자가 지정한 출발 및 복귀 시간에 맞추어 실시간 날씨를 분석합니다.'
   }
 };
 
@@ -371,20 +371,20 @@ export function generateOutfitRecommendation(weatherForecast, scheduleMode = 'mo
       ...SCHEDULE_MODES.CUSTOM,
       departureHour: depHour,
       returnHour: retHour,
-      description: `${depTimeFormatted} 등교/출발 ~ ${retTimeFormatted} 하교/복귀 맞춤 분석입니다.`
+      description: `${depTimeFormatted} 출발 ~ ${retTimeFormatted} 복귀 맞춤 분석입니다.`
     };
     const hourly = weatherForecast.hourly;
     const dItem = interpolateSlot(hourly, depH, depM);
     const rItem = interpolateSlot(hourly, retH, retM);
     depSlot = {
-      title: '등교 / 출발 시간',
+      title: '출발 시간',
       timeRange: depTimeFormatted,
       hour: depH,
       min: depM,
       ...dItem
     };
     retSlot = {
-      title: '하교 / 복귀 시간',
+      title: '복귀 시간',
       timeRange: retTimeFormatted,
       hour: retH,
       min: retM,
@@ -466,8 +466,8 @@ export function generateOutfitRecommendation(weatherForecast, scheduleMode = 'mo
   } else {
     const depTimeFormatted = (typeof customDep === 'object' && customDep !== null) ? `${String(customDep.hour).padStart(2, '0')}:${String(customDep.min ?? 0).padStart(2, '0')}` : `${customDep}:00`;
     const retTimeFormatted = (typeof customRet === 'object' && customRet !== null) ? `${String(customRet.hour).padStart(2, '0')}:${String(customRet.min ?? 0).padStart(2, '0')}` : `${customRet}:00`;
-    headline = `${depTimeFormatted} 등교 ~ ${retTimeFormatted} 하교 맞춤 스마트 코디`;
-    rationale = `등교(${depSlot.temp}℃)와 하교(${retSlot.temp}℃) 사이의 체감온도(${minCampusTemp}℃ ~ ${maxCampusTemp}℃)를 종합하여 가장 편안한 착장을 조합했습니다.`;
+    headline = `${depTimeFormatted} 출발 ~ ${retTimeFormatted} 복귀 맞춤 스마트 코디`;
+    rationale = `출발(${depSlot.temp}℃)과 복귀(${retSlot.temp}℃) 사이의 체감온도(${minCampusTemp}℃ ~ ${maxCampusTemp}℃)를 종합하여 가장 편안한 착장을 조합했습니다.`;
   }
 
   // Filter items based on rain / wind / diurnal swing

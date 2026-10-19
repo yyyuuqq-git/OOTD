@@ -94,44 +94,40 @@
             <span class="mode-icon">⚙️</span>
             <div class="mode-info">
               <strong class="mode-title">자율 스케줄</strong>
-              <span class="mode-desc">등교 및 하교 시간 직접 지정</span>
+              <span class="mode-desc">출발 및 복귀 시간 직접 지정</span>
             </div>
           </button>
         </div>
 
-        <!-- Custom hour selector with 30-minute typing & step buttons -->
+        <!-- Custom hour selector with 10-minute direct keyboard typing -->
         <div id="customScheduleInputs" class="custom-hours-row" style="display: none;">
           <div class="time-type-group">
             <label for="depTimeInput">
               <span class="type-icon">🌅</span>
-              <span class="type-label">등교 / 출발 시간 (30분 단위)</span>
+              <span class="type-label">출발 시간 (10분 단위)</span>
             </label>
             <div class="time-input-box">
-              <button type="button" class="time-step-btn" data-target="depTimeInput" data-step="-30" title="30분 이전">-30분</button>
-              <input type="text" id="depTimeInput" class="time-type-input" value="09:00" placeholder="09:30" maxlength="5">
-              <button type="button" class="time-step-btn" data-target="depTimeInput" data-step="30" title="30분 이후">+30분</button>
+              <input type="text" id="depTimeInput" class="time-type-input" value="09:00" placeholder="09:10" maxlength="5">
               <span class="time-unit">출발</span>
             </div>
-            <span class="time-type-hint">30분 단위 타이핑 (예: 09:30)</span>
+            <span class="time-type-hint">10분 단위 직접 입력 (예: 09:10)</span>
           </div>
 
           <div class="time-arrow-divider">➔</div>
 
           <div class="time-type-group">
             <label for="retTimeInput">
-              <span class="type-icon">🏫</span>
-              <span class="type-label">하교 / 복귀 시간 (30분 단위)</span>
+              <span class="type-icon">🏠</span>
+              <span class="type-label">복귀 시간 (10분 단위)</span>
             </label>
             <div class="time-input-box">
-              <button type="button" class="time-step-btn" data-target="retTimeInput" data-step="-30" title="30분 이전">-30분</button>
-              <input type="text" id="retTimeInput" class="time-type-input" value="17:00" placeholder="17:30" maxlength="5">
-              <button type="button" class="time-step-btn" data-target="retTimeInput" data-step="30" title="30분 이후">+30분</button>
-              <span class="time-unit">하교</span>
+              <input type="text" id="retTimeInput" class="time-type-input" value="17:00" placeholder="16:40" maxlength="5">
+              <span class="time-unit">복귀</span>
             </div>
-            <span class="time-type-hint">30분 단위 타이핑 (예: 16:30)</span>
+            <span class="time-type-hint">10분 단위 직접 입력 (예: 16:40)</span>
           </div>
 
-          <button id="applyCustomTimeBtn" class="apply-time-btn" type="button" title="입력한 30분 단위 시간 적용">
+          <button id="applyCustomTimeBtn" class="apply-time-btn" type="button" title="입력한 10분 단위 시간 적용">
             <span>적용</span>
           </button>
         </div>
